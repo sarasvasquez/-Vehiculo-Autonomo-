@@ -1,0 +1,10 @@
+# Ignorar entornos virtuales
+.venv*/
+*/.venv*/
+
+# Ignorar archivos de macOS
+.DS_Store
+*/.DS_Store
+
+# Ignorar logs del servidor
+server/logs/
