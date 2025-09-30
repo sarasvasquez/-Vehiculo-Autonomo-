@@ -1,85 +1,54 @@
-Proyecto: Vehículo Autónomo de Telemetría
-Descripción
-Sistema cliente-servidor que simula un vehículo autónomo que envía telemetría (velocidad, batería, temperatura, dirección) a múltiples usuarios y recibe comandos de control.
-Integrantes
+# 🚗 Proyecto: Vehículo Autónomo de Telemetrí
 
-[Nombre 1]
-[Nombre 2]
-[Nombre 3]
+📚 **Asignatura:** Telematica 
+📅 **Periodo:** 2025-2  
+👥 **Equipo de trabajo:** *[Sara Isabel Vasquez, Maria Clara Medina, Nicol Franchesca Garcia]*  
 
-Estructura del Proyecto
-├── docs/           # Documentación del protocolo
-├── server/         # Servidor en C
-├── clients/        # Clientes en Python y Java
-└── README.md
-Requisitos Previos
-Servidor (C)
+---
 
-GCC compiler
-Make
-Linux/Unix/macOS (o WSL en Windows)
+## 📖 Descripción
+Este proyecto consiste en el diseño e implementación de un **protocolo de comunicaciones de capa de aplicación** para un vehículo autónomo terrestre.  
+El vehículo transmite datos de telemetría en tiempo real (velocidad, nivel de batería, temperatura) y recibe comandos de control de distintos clientes conectados.  
 
-Cliente Python
+El sistema incluye:  
+- **Servidor en C** usando la API de Sockets de Berkeley.  
+- **Clientes en al menos dos lenguajes distintos** (ejemplo: Python y Java).  
+- **Interfaz gráfica en el cliente** para visualizar la telemetría.  
+- **Gestión de usuarios** (administrador y observador).  
+- **Logging en servidor** para registrar peticiones y respuestas.  
 
-Python 3.8+
-tkinter (para GUI)
+---
 
-Cliente Java
+## 🎯 Objetivos
+- Implementar un protocolo de aplicación que permita la comunicación entre un vehículo autónomo y múltiples clientes.  
+- Diseñar un sistema concurrente donde el servidor maneje múltiples conexiones simultáneas.  
+- Garantizar la autenticación de administradores y la distribución confiable de telemetría.  
 
-JDK 11+
+---
 
-Compilación y Ejecución
-Servidor
-bashcd server
-make
-./server 5000 logs/server.log
-Parámetros:
+## ⚡ Requerimientos principales
+1. Enviar información de telemetría a todos los usuarios cada **10 segundos**.  
+2. Recibir comandos de control:  
+   - `SPEED UP`  
+   - `SLOW DOWN`  
+   - `TURN LEFT`  
+   - `TURN RIGHT`  
+3. Gestionar dos tipos de usuarios:  
+   - **Administrador:** puede enviar comandos y consultar usuarios.  
+   - **Observador:** solo recibe datos.  
+4. Especificar el protocolo en formato **texto**, incluyendo:  
+   - Visión general.  
+   - Especificación del servicio.  
+   - Formato de mensajes.  
+   - Reglas de procedimiento.  
+   - Ejemplos de uso.  
 
-5000: Puerto TCP para comandos
-logs/server.log: Archivo de logs
+---
 
-El servidor automáticamente usa el puerto 5001 para telemetría UDP.
-Cliente Python
-bashcd clients/python
-pip install -r requirements.txt
-python client.py
-Cliente Java
-bashcd clients/java
-javac Client.java
-java Client
-Uso
-Como Observador
+## 🛠️ Tecnologías
+- **Servidor:** C (Sockets Berkeley, GCC, Makefile).  
+- **Clientes:** Python y Java.  
+- **Control de versiones:** Git / GitHub.  
+- **Herramientas de apoyo:** Wireshark, Postman, Beej’s Guide.  
 
-Ejecutar el cliente
-Conectar como "Observer"
-Ver telemetría en tiempo real
-
-Como Administrador
-
-Ejecutar el cliente
-Conectar como "Admin" con password: admin123
-Enviar comandos: SPEED UP, SLOW DOWN, TURN LEFT, TURN RIGHT
-Ver lista de usuarios conectados
-
-Protocolo
-Ver especificación completa en: docs/protocolo.md
-Puertos
-
-TCP 5000: Comandos y autenticación
-UDP 5001: Telemetría (cada 10 segundos)
-
-Comandos Disponibles
-
-SPEED UP: Aumentar velocidad
-SLOW DOWN: Disminuir velocidad
-TURN LEFT: Girar izquierda
-TURN RIGHT: Girar derecha
-LIST USERS: Ver usuarios conectados (solo admin)
-
-Video Demostración
-[Enlace al video]
-Notas
-
-El servidor soporta hasta 50 clientes simultáneos
-La telemetría se envía automáticamente cada 10 segundos
-Los comandos requieren permisos de administrador
+---
