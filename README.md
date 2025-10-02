@@ -2,7 +2,7 @@
 
  **Asignatura:** Telematica 
  **Periodo:** 2025-2  
- **Equipo de trabajo:** *[Sara Isabel Vasquez, Maria Clara Medina, Nicol Franchesca Garcia]*  
+ **Equipo de trabajo:** *Sara Isabel Vasquez, Maria Clara Medina, Nicol Franchesca Garcia*  
 
 ---
 
@@ -52,3 +52,4 @@ El sistema incluye:
 - **Herramientas de apoyo:** Wireshark, Postman, Beej’s Guide.  
 
 ---
+
