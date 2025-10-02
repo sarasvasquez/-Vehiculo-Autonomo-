@@ -1,0 +1,62 @@
+REQUISITOS DEL SERVIDOR - VEHÍCULO AUTÓNOMO
+============================================
+
+SISTEMA OPERATIVO:
+------------------
+- Linux/Unix/macOS: Compilación nativa
+- Windows: Requiere WSL (Windows Subsystem for Linux)
+
+INSTALACIÓN DE WSL EN WINDOWS:
+-------------------------------
+1. Abrir PowerShell como Administrador
+2. Ejecutar: wsl --install
+3. Reiniciar computadora
+4. Configurar Ubuntu (crear usuario y contraseña)
+5. Instalar herramientas: sudo apt install build-essential
+
+HERRAMIENTAS REQUERIDAS:
+------------------------
+- GCC (GNU Compiler Collection) >= 7.0
+- Make
+- pthread (POSIX Threads)
+- Sockets Berkeley API
+
+LIBRERÍAS DEL SISTEMA:
+----------------------
+- stdio.h
+- stdlib.h
+- string.h
+- unistd.h
+- pthread.h
+- sys/socket.h
+- sys/types.h
+- netinet/in.h
+- arpa/inet.h
+- time.h
+- errno.h
+- signal.h
+
+VERIFICAR INSTALACIÓN:
+----------------------
+gcc --version
+make --version
+
+COMPILAR:
+---------
+cd server
+make
+
+EJECUTAR:
+---------
+./server 5000 logs/server.log
+
+PUERTOS USADOS:
+---------------
+- TCP 5000: Comandos y autenticación
+- UDP: Telemetría (se envía a los clientes)
+
+NOTAS:
+------
+- Si estás en Windows y ves errores de "include", necesitas abrir
+  el proyecto EN WSL usando VS Code con la extensión WSL instalada.
+- En VS Code, presiona Ctrl+Shift+P y selecciona "WSL: Connect to WSL"
