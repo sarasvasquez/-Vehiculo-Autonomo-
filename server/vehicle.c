@@ -1,8 +1,8 @@
 #include "vehicle.h"
 
-// ============================================================
+
 // FUNCIONES DEL VEHÍCULO
-// ============================================================
+
 
 // Inicializa el estado del vehículo con valores por defecto
 void init_vehicle(VehicleState *vehicle) {
@@ -110,9 +110,9 @@ int execute_command(VehicleState *vehicle, const char *command, char *response) 
     return success;
 }
 
-// ============================================================
+
 // FUNCIONES DE GESTIÓN DE CLIENTES
-// ============================================================
+
 
 // Inicializa la lista de clientes vacía
 void init_client_list(ClientList *list) {
@@ -216,9 +216,9 @@ void get_client_list_string(ClientList *list, char *buffer) {
     pthread_mutex_unlock(&list->lock);
 }
 
-// ============================================================
+
 // FUNCIONES DE LOGGING
-// ============================================================
+
 
 // Escribe un mensaje tanto en consola como en archivo de log
 void log_message(FILE *log_file, pthread_mutex_t *log_lock, 
@@ -245,9 +245,9 @@ void log_message(FILE *log_file, pthread_mutex_t *log_lock,
     pthread_mutex_unlock(log_lock);
 }
 
-// ============================================================
+
 // FUNCIONES DEL PROTOCOLO
-// ============================================================
+
 
 // Parsea un mensaje recibido en sus componentes
 // Entrada: "TIPO|LONGITUD|DATOS\n"

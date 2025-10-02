@@ -1,9 +1,9 @@
 #include "vehicle.h"
 #include <signal.h>
 
-// ============================================================
+
 // VARIABLES GLOBALES (para poder cerrar desde signal handler)
-// ============================================================
+
 int tcp_socket_fd = -1;
 int udp_socket_fd = -1;
 FILE *global_log_file = NULL;
@@ -17,9 +17,9 @@ void signal_handler(int signum) {
     exit(0);
 }
 
-// ============================================================
+
 // THREAD: MANEJO DE CADA CLIENTE TCP
-// ============================================================
+
 void* handle_client(void* arg) {
     ThreadData *data = (ThreadData*)arg;
     int client_socket = data->client_socket;
@@ -191,9 +191,9 @@ void* handle_client(void* arg) {
     return NULL;
 }
 
-// ============================================================
+
 // THREAD: ENVÍO DE TELEMETRÍA UDP CADA 10 SEGUNDOS
-// ============================================================
+
 void* send_telemetry(void* arg) {
     ThreadData *data = (ThreadData*)arg;
     VehicleState *vehicle = data->vehicle;
@@ -240,9 +240,9 @@ void* send_telemetry(void* arg) {
     return NULL;
 }
 
-// ============================================================
+
 // FUNCIÓN PRINCIPAL
-// ============================================================
+
 int main(int argc, char *argv[]) {
     // Verificar argumentos
     if (argc != 3) {
