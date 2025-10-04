@@ -225,6 +225,9 @@ void* send_telemetry(void* arg) {
             if (client_list->clients[i].active) {
                 struct sockaddr_in client_addr = client_list->clients[i].addr;
                 
+                // ===== CAMBIO: Configurar puerto UDP 5001 =====
+                client_addr.sin_port = htons(5001);
+                
                 // Enviar por UDP
                 sendto(udp_sock, buffer, strlen(buffer), 0,
                        (struct sockaddr*)&client_addr, sizeof(client_addr));
