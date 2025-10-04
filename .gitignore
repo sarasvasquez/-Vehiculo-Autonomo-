@@ -8,3 +8,7 @@
 
 # Ignorar logs del servidor
 server/logs/
+
+# Ignorar binarios compilados
+server/server
+server/*.o
