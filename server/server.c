@@ -206,6 +206,12 @@ void* send_telemetry(void* arg) {
         return NULL;
     }
     
+    // IMPORTANTE: Habilitar broadcast
+    int broadcast = 1;
+    if (setsockopt(udp_sock, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) < 0) {
+        perror("Error configurando broadcast");
+    }
+    
     udp_socket_fd = udp_sock;
     
     char buffer[BUFFER_SIZE];
@@ -221,22 +227,35 @@ void* send_telemetry(void* arg) {
         // Enviar a todos los clientes activos
         pthread_mutex_lock(&client_list->lock);
         
+        int sent_count = 0;
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (client_list->clients[i].active) {
                 struct sockaddr_in client_addr = client_list->clients[i].addr;
                 
-                // ===== CAMBIO: Configurar puerto UDP 5001 =====
+                // CAMBIO CRÍTICO: Configurar puerto UDP correcto
                 client_addr.sin_port = htons(5001);
                 
                 // Enviar por UDP
-                sendto(udp_sock, buffer, strlen(buffer), 0,
+                ssize_t sent = sendto(udp_sock, buffer, strlen(buffer), 0,
                        (struct sockaddr*)&client_addr, sizeof(client_addr));
+                
+                if (sent > 0) {
+                    sent_count++;
+                    printf("[TELEMETRY] Enviado a %s:%d (%zd bytes)\n", 
+                           inet_ntoa(client_addr.sin_addr), 
+                           ntohs(client_addr.sin_port), 
+                           sent);
+                } else {
+                    printf("[TELEMETRY] Error enviando a %s:%d\n",
+                           inet_ntoa(client_addr.sin_addr),
+                           ntohs(client_addr.sin_port));
+                }
             }
         }
         
         pthread_mutex_unlock(&client_list->lock);
         
-        printf("[TELEMETRY] Enviado: %s", buffer);
+        printf("[TELEMETRY] Enviado a %d clientes: %s", sent_count, buffer);
     }
     
     close(udp_sock);
