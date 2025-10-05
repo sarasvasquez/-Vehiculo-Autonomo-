@@ -1,329 +1,321 @@
+
+# client.py
+# Cliente GUI para el servidor del vehículo autónomo.
+# Reemplaza tu antiguo client.py por este archivo.
+
 import socket
 import threading
 import tkinter as tk
 from tkinter import messagebox
 import time
 
-class App(tk.Tk):
+BUFFER = 4096
+
+def build_message(msg_type: str, data: str) -> str:
+    data_len = len(data)
+    return f"{msg_type}|{data_len:04d}|{data}\n"
+
+def parse_message(message: str):
+    parts = message.strip().split("|", 2)
+    if len(parts) >= 3:
+        return parts[0], parts[2]
+    return "", ""
+
+class TelemetryApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Cliente Vehículo Autónomo - Python")
-        self.geometry("700x600")
-        self.resizable(False, False)
-        
-        # Variables de conexión
-        self.tcp_socket = None
-        self.udp_socket = None
+        self.title("Cliente Vehículo Autónomo")
+        self.geometry("720x520")
+        self.minsize(720, 520)
+
+        # Sockets y estado
+        self.tcp_sock = None
+        self.udp_sock = None
         self.connected = False
-        self.client_id = ""
         self.is_admin = False
-        
-        # Variables de telemetría
-        self.v_speed = tk.StringVar(value="0.0")
-        self.v_batt = tk.StringVar(value="0")
-        self.v_temp = tk.StringVar(value="0.0")
-        self.v_dir = tk.StringVar(value="-")
-        
-        self.create_widgets()
-        
-    def create_widgets(self):
-        # Frame de conexión
-        conn_frame = tk.LabelFrame(self, text="Conexión", padx=10, pady=10)
-        conn_frame.pack(fill="x", padx=10, pady=10)
-        
-        tk.Label(conn_frame, text="Servidor:").grid(row=0, column=0, sticky="e", padx=5)
-        self.host_entry = tk.Entry(conn_frame, width=15)
-        self.host_entry.insert(0, "127.0.0.1")
-        self.host_entry.grid(row=0, column=1, padx=5)
-        
-        tk.Label(conn_frame, text="Puerto:").grid(row=0, column=2, sticky="e", padx=5)
-        self.port_entry = tk.Entry(conn_frame, width=8)
-        self.port_entry.insert(0, "5000")
-        self.port_entry.grid(row=0, column=3, padx=5)
-        
-        tk.Label(conn_frame, text="Tipo:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        self.client_id = None
+
+        # Telemetry vars
+        self.var_speed = tk.StringVar(value="0")
+        self.var_batt  = tk.StringVar(value="0")
+        self.var_temp  = tk.StringVar(value="0")
+        self.var_dir   = tk.StringVar(value="-")
+
+        self._build_ui()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _build_ui(self):
+        frm_conn = tk.LabelFrame(self, text="Conexión")
+        frm_conn.pack(fill="x", padx=10, pady=8)
+
+        tk.Label(frm_conn, text="Host:").grid(row=0, column=0, padx=6, pady=6, sticky="w")
+        self.ent_host = tk.Entry(frm_conn, width=20); self.ent_host.grid(row=0, column=1)
+        self.ent_host.insert(0, "127.0.0.1")
+
+        tk.Label(frm_conn, text="Puerto TCP:").grid(row=0, column=2, padx=6, sticky="w")
+        self.ent_port = tk.Entry(frm_conn, width=8); self.ent_port.grid(row=0, column=3)
+        self.ent_port.insert(0, "5555")
+
         self.user_type = tk.StringVar(value="OBSERVER")
-        tk.Radiobutton(conn_frame, text="Observador", variable=self.user_type, 
-                      value="OBSERVER").grid(row=1, column=1, sticky="w")
-        tk.Radiobutton(conn_frame, text="Administrador", variable=self.user_type, 
-                      value="ADMIN").grid(row=1, column=2, sticky="w")
-        
-        tk.Label(conn_frame, text="Password:").grid(row=2, column=0, sticky="e", padx=5)
-        self.password_entry = tk.Entry(conn_frame, show="*", width=15)
-        self.password_entry.insert(0, "admin123")
-        self.password_entry.grid(row=2, column=1, padx=5)
-        
-        self.connect_btn = tk.Button(conn_frame, text="Conectar", 
-                                     command=self.connect, bg="green", fg="white")
-        self.connect_btn.grid(row=2, column=2, columnspan=2, padx=5)
-        
-        # Frame de telemetría
-        telem_frame = tk.LabelFrame(self, text="Telemetría", padx=10, pady=10)
-        telem_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        tk.Label(telem_frame, text="Velocidad:", font=("Helvetica", 13)).grid(
-            row=0, column=0, sticky="e", padx=12, pady=12)
-        tk.Label(telem_frame, textvariable=self.v_speed, 
-                font=("Helvetica", 28, "bold"), fg="blue").grid(row=0, column=1, sticky="w")
-        tk.Label(telem_frame, text="km/h", font=("Helvetica", 13)).grid(
-            row=0, column=2, sticky="w")
-        
-        tk.Label(telem_frame, text="Batería:", font=("Helvetica", 13)).grid(
-            row=1, column=0, sticky="e", padx=12, pady=12)
-        tk.Label(telem_frame, textvariable=self.v_batt, 
-                font=("Helvetica", 28, "bold"), fg="green").grid(row=1, column=1, sticky="w")
-        tk.Label(telem_frame, text="%", font=("Helvetica", 13)).grid(
-            row=1, column=2, sticky="w")
-        
-        tk.Label(telem_frame, text="Temperatura:", font=("Helvetica", 13)).grid(
-            row=2, column=0, sticky="e", padx=12, pady=12)
-        tk.Label(telem_frame, textvariable=self.v_temp, 
-                font=("Helvetica", 28, "bold"), fg="red").grid(row=2, column=1, sticky="w")
-        tk.Label(telem_frame, text="°C", font=("Helvetica", 13)).grid(
-            row=2, column=2, sticky="w")
-        
-        tk.Label(telem_frame, text="Dirección:", font=("Helvetica", 13)).grid(
-            row=3, column=0, sticky="e", padx=12, pady=12)
-        tk.Label(telem_frame, textvariable=self.v_dir, 
-                font=("Helvetica", 28, "bold"), fg="purple").grid(row=3, column=1, sticky="w")
-        
-        # Frame de comandos
-        cmd_frame = tk.LabelFrame(self, text="Comandos (Solo Admin)", 
-                                 padx=10, pady=10)
-        cmd_frame.pack(fill="x", padx=10, pady=10)
-        
-        self.speedup_btn = tk.Button(cmd_frame, text="⬆ SPEED UP", 
-                                     command=lambda: self.send_command("SPUP"),
-                                     state="disabled", width=15)
-        self.speedup_btn.grid(row=0, column=0, padx=5, pady=5)
-        
-        self.slowdown_btn = tk.Button(cmd_frame, text="⬇ SLOW DOWN", 
-                                      command=lambda: self.send_command("SPDN"),
-                                      state="disabled", width=15)
-        self.slowdown_btn.grid(row=0, column=1, padx=5, pady=5)
-        
-        self.left_btn = tk.Button(cmd_frame, text="⬅ TURN LEFT", 
-                                 command=lambda: self.send_command("TNLF"),
-                                 state="disabled", width=15)
-        self.left_btn.grid(row=1, column=0, padx=5, pady=5)
-        
-        self.right_btn = tk.Button(cmd_frame, text="➡ TURN RIGHT", 
-                                  command=lambda: self.send_command("TNRT"),
-                                  state="disabled", width=15)
-        self.right_btn.grid(row=1, column=1, padx=5, pady=5)
-        
-        self.list_btn = tk.Button(cmd_frame, text="📋 LIST USERS", 
-                                 command=self.list_users,
-                                 state="disabled", width=15)
-        self.list_btn.grid(row=2, column=0, padx=5, pady=5)
-        
-        self.disconnect_btn = tk.Button(cmd_frame, text="❌ DISCONNECT", 
-                                       command=self.disconnect,
-                                       state="disabled", width=15, bg="red", fg="white")
-        self.disconnect_btn.grid(row=2, column=1, padx=5, pady=5)
-        
-        # Consola de mensajes
-        console_frame = tk.LabelFrame(self, text="Consola", padx=5, pady=5)
-        console_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        self.console = tk.Text(console_frame, height=8, state="disabled")
-        scrollbar = tk.Scrollbar(console_frame, command=self.console.yview)
-        self.console.config(yscrollcommand=scrollbar.set)
-        self.console.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-    def log(self, message):
-        self.console.config(state="normal")
-        timestamp = time.strftime("%H:%M:%S")
-        self.console.insert("end", f"[{timestamp}] {message}\n")
-        self.console.see("end")
-        self.console.config(state="disabled")
-        
-    def connect(self):
+        tk.Radiobutton(frm_conn, text="Observador", variable=self.user_type, value="OBSERVER").grid(row=1, column=0, sticky="w")
+        tk.Radiobutton(frm_conn, text="Administrador", variable=self.user_type, value="ADMIN").grid(row=1, column=1, sticky="w")
+
+        tk.Label(frm_conn, text="Password (admin):").grid(row=1, column=2, sticky="e")
+        self.ent_pass = tk.Entry(frm_conn, show="*", width=12); self.ent_pass.grid(row=1, column=3)
+        self.ent_pass.insert(0, "admin123")
+
+        self.btn_connect = tk.Button(frm_conn, text="Conectar", command=self.on_connect)
+        self.btn_connect.grid(row=0, column=4, padx=6)
+        self.btn_disconnect = tk.Button(frm_conn, text="Desconectar", command=self.on_disconnect, state="disabled")
+        self.btn_disconnect.grid(row=0, column=5, padx=6)
+
+        self.lbl_status = tk.Label(self, text="Estado: Desconectado"); self.lbl_status.pack(fill="x", padx=12)
+
+        # Telemetry frame
+        frm_tel = tk.LabelFrame(self, text="Telemetría")
+        frm_tel.pack(fill="both", expand=True, padx=10, pady=8)
+
+        tk.Label(frm_tel, text="Velocidad:").grid(row=0, column=0, padx=10, pady=10, sticky="e")
+        tk.Label(frm_tel, textvariable=self.var_speed, font=("Segoe UI", 16, "bold")).grid(row=0, column=1, padx=10, pady=10, sticky="w")
+        tk.Label(frm_tel, text="km/h").grid(row=0, column=2, sticky="w")
+
+        tk.Label(frm_tel, text="Batería:").grid(row=1, column=0, padx=10, pady=10, sticky="e")
+        tk.Label(frm_tel, textvariable=self.var_batt, font=("Segoe UI", 16, "bold")).grid(row=1, column=1, padx=10, pady=10, sticky="w")
+        tk.Label(frm_tel, text="%").grid(row=1, column=2, sticky="w")
+
+        tk.Label(frm_tel, text="Temperatura:").grid(row=2, column=0, padx=10, pady=10, sticky="e")
+        tk.Label(frm_tel, textvariable=self.var_temp, font=("Segoe UI", 16, "bold")).grid(row=2, column=1, padx=10, pady=10, sticky="w")
+        tk.Label(frm_tel, text="°C").grid(row=2, column=2, sticky="w")
+
+        tk.Label(frm_tel, text="Dirección:").grid(row=3, column=0, padx=10, pady=10, sticky="e")
+        tk.Label(frm_tel, textvariable=self.var_dir, font=("Segoe UI", 16, "bold")).grid(row=3, column=1, padx=10, pady=10, sticky="w")
+
+        # Commands frame (admin only)
+        frm_cmd = tk.LabelFrame(self, text="Comandos (solo admin)")
+        frm_cmd.pack(fill="x", padx=10, pady=6)
+
+        self.btn_spup = tk.Button(frm_cmd, text="⬆ SPEED UP", command=lambda: self.send_command("SPUP"), state="disabled"); self.btn_spup.grid(row=0,column=0,padx=6)
+        self.btn_spdn = tk.Button(frm_cmd, text="⬇ SLOW DOWN", command=lambda: self.send_command("SPDN"), state="disabled"); self.btn_spdn.grid(row=0,column=1,padx=6)
+        self.btn_left = tk.Button(frm_cmd, text="⬅ TURN LEFT", command=lambda: self.send_command("TNLF"), state="disabled"); self.btn_left.grid(row=0,column=2,padx=6)
+        self.btn_right= tk.Button(frm_cmd, text="➡ TURN RIGHT", command=lambda: self.send_command("TNRT"), state="disabled"); self.btn_right.grid(row=0,column=3,padx=6)
+        self.btn_list  = tk.Button(frm_cmd, text="📋 LIST USERS", command=self.send_list, state="disabled"); self.btn_list.grid(row=0,column=4,padx=6)
+
+        # Console
+        self.txt_console = tk.Text(self, height=8, state="disabled")
+        self.txt_console.pack(fill="both", expand=False, padx=10, pady=(0,10))
+        self._append_console(">> Cliente listo.")
+
+    # UI helpers
+    def _append_console(self, text: str):
+        self.txt_console.configure(state="normal")
+        self.txt_console.insert("end", text.rstrip() + "\n")
+        self.txt_console.see("end")
+        self.txt_console.configure(state="disabled")
+
+    def _set_status(self, text: str, bad: bool=False):
+        self.lbl_status.config(text=f"Estado: {text}", foreground=("#a00" if bad else "#000"))
+        self._append_console(text)
+
+    # Connect / handshake
+    def on_connect(self):
         if self.connected:
             messagebox.showwarning("Advertencia", "Ya estás conectado")
             return
-            
+
+        host = self.ent_host.get().strip()
         try:
-            host = self.host_entry.get()
-            port = int(self.port_entry.get())
-            
-            # Crear socket TCP
-            self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.tcp_socket.connect((host, port))
-            self.log(f"Conectado a {host}:{port}")
-            
-            # Enviar mensaje de conexión
-            if self.user_type.get() == "ADMIN":
-                password = self.password_entry.get()
-                conn_msg = f"ADMIN:{password}"
-                self.is_admin = True
-            else:
-                conn_msg = "OBSERVER"
-                self.is_admin = False
-                
-            message = self.build_message("CONN", conn_msg)
-            self.tcp_socket.send(message.encode())
-            self.log(f"Enviado: {message.strip()}")
-            
-            # Recibir respuesta
-            response = self.tcp_socket.recv(1024).decode()
-            self.log(f"Recibido: {response.strip()}")
-            
-            msg_type, msg_data = self.parse_message(response)
-            
-            if msg_type == "CACK":
-                self.client_id = msg_data
+            port = int(self.ent_port.get().strip())
+        except ValueError:
+            messagebox.showerror("Error", "Puerto inválido")
+            return
+
+        # Crear UDP ephemeral socket para recibir telemetría
+        try:
+            self.udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.udp_sock.bind(("0.0.0.0", 0))
+            udp_port = self.udp_sock.getsockname()[1]
+            self._append_console(f"UDP creado en puerto local {udp_port}")
+        except Exception as e:
+            self._append_console(f"Error creando UDP: {e}")
+            self.udp_sock = None
+            udp_port = 0
+
+        # Crear TCP y conectar
+        try:
+            self.tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.tcp_sock.settimeout(6.0)
+            self._append_console(f"Conectando a {host}:{port} ...")
+            self.tcp_sock.connect((host, port))
+            # volver a modo bloqueante
+            self.tcp_sock.settimeout(None)
+        except Exception as e:
+            self._append_console(f"Error TCP connect: {e}")
+            messagebox.showerror("Error", f"No se pudo conectar TCP: {e}")
+            try:
+                if self.tcp_sock: self.tcp_sock.close()
+            except:
+                pass
+            self.tcp_sock = None
+            if self.udp_sock:
+                try: self.udp_sock.close()
+                except: pass
+                self.udp_sock = None
+            return
+
+        # Preparar CONN incluyendo puerto UDP
+        if self.user_type.get() == "ADMIN":
+            passwd = self.ent_pass.get().strip()
+            conn_data = f"ADMIN:{passwd}:{udp_port}"
+            self.is_admin = True
+        else:
+            conn_data = f"OBSERVER:{udp_port}"
+            self.is_admin = False
+
+        try:
+            msg = build_message("CONN", conn_data)
+            self.tcp_sock.sendall(msg.encode())
+            self._append_console(f"Enviado: {msg.strip()}")
+
+            # leer respuesta de handshake (línea)
+            buf = b""
+            while b"\n" not in buf:
+                chunk = self.tcp_sock.recv(BUFFER)
+                if not chunk:
+                    raise ConnectionError("Servidor cerró la conexión")
+                buf += chunk
+            line, _ = buf.split(b"\n", 1)
+            line = line.decode(errors="ignore").strip()
+            self._append_console(f"Recibido: {line}")
+            typ, data = parse_message(line)
+            if typ == "CACK":
+                self.client_id = data
                 self.connected = True
-                self.log(f"✓ Conectado como {self.client_id}")
-                
-                # Iniciar recepción UDP
-                self.start_udp_receiver()
-                
-                # Iniciar recepción TCP
-                threading.Thread(target=self.receive_tcp, daemon=True).start()
-                
-                # Actualizar interfaz
-                self.connect_btn.config(state="disabled")
-                self.disconnect_btn.config(state="normal")
-                
+                self._append_console(f"✓ Conectado como {self.client_id}")
+                # iniciar listeners
+                threading.Thread(target=self._tcp_recv_loop, daemon=True).start()
+                if self.udp_sock:
+                    threading.Thread(target=self._udp_recv_loop, daemon=True).start()
+                # habilitar UI
                 if self.is_admin:
-                    self.speedup_btn.config(state="normal")
-                    self.slowdown_btn.config(state="normal")
-                    self.left_btn.config(state="normal")
-                    self.right_btn.config(state="normal")
-                    self.list_btn.config(state="normal")
-                    
-            elif msg_type == "CERR":
-                self.log(f"✗ Error: {msg_data}")
-                self.tcp_socket.close()
-                self.tcp_socket = None
-                messagebox.showerror("Error", f"Conexión rechazada: {msg_data}")
-                
+                    for b in (self.btn_spup, self.btn_spdn, self.btn_left, self.btn_right, self.btn_list):
+                        b.config(state="normal")
+                self.btn_connect.config(state="disabled")
+                self.btn_disconnect.config(state="normal")
+                self._set_status("Conectado")
+            else:
+                self._append_console(f"✗ Conexión rechazada: {typ} {data}")
+                messagebox.showerror("Error", f"Conexión rechazada: {typ} {data}")
+                try: self.tcp_sock.close()
+                except: pass
+                self.tcp_sock = None
         except Exception as e:
-            self.log(f"✗ Error de conexión: {e}")
-            messagebox.showerror("Error", f"No se pudo conectar: {e}")
-            if self.tcp_socket:
-                self.tcp_socket.close()
-                self.tcp_socket = None
-                
-    def start_udp_receiver(self):
+            self._append_console(f"Error handshake: {e}")
+            try: self.tcp_sock.close()
+            except: pass
+            self.tcp_sock = None
+
+    def _tcp_recv_loop(self):
         try:
-            self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.udp_socket.bind(("0.0.0.0", 5001))
-            threading.Thread(target=self.receive_udp, daemon=True).start()
-            self.log("Receptor UDP iniciado en puerto 5001")
-        except Exception as e:
-            self.log(f"Error iniciando UDP: {e}")
-            
-    def receive_udp(self):
-        while self.connected:
-            try:
-                data, addr = self.udp_socket.recvfrom(1024)
-                message = data.decode()
-                msg_type, msg_data = self.parse_message(message)
-                
-                if msg_type == "TELE":
-                    self.process_telemetry(msg_data)
-                    
-            except Exception as e:
-                if self.connected:
-                    self.log(f"Error UDP: {e}")
-                break
-                
-    def receive_tcp(self):
-        while self.connected:
-            try:
-                data = self.tcp_socket.recv(1024)
+            while self.connected and self.tcp_sock:
+                data = self.tcp_sock.recv(BUFFER)
                 if not data:
-                    self.log("Servidor cerró la conexión")
-                    self.disconnect()
                     break
-                    
-                message = data.decode()
-                self.log(f"Recibido: {message.strip()}")
-                
-            except Exception as e:
-                if self.connected:
-                    self.log(f"Error TCP: {e}")
-                break
-                
-    def process_telemetry(self, data):
-        # Parsear: SPEED:45.5|BATTERY:78|TEMP:35.2|DIR:NORTH
-        parts = data.split("|")
-        for part in parts:
-            if ":" in part:
-                key, value = part.split(":", 1)
-                if key == "SPEED":
-                    self.v_speed.set(value)
-                elif key == "BATTERY":
-                    self.v_batt.set(value)
-                elif key == "TEMP":
-                    self.v_temp.set(value)
-                elif key == "DIR":
-                    self.v_dir.set(value)
-                    
-    def send_command(self, command):
+                for line in data.decode(errors="ignore").splitlines():
+                    self._append_console(f"TCP: {line}")
+        except Exception as e:
+            if self.connected: self._append_console(f"TCP recv error: {e}")
+        finally:
+            self._append_console("TCP cerrado por servidor")
+            self.on_disconnect()
+
+    def _udp_recv_loop(self):
+        try:
+            while self.connected and self.udp_sock:
+                try:
+                    data, addr = self.udp_sock.recvfrom(BUFFER)
+                except OSError:
+                    break
+                text = data.decode(errors="ignore").strip()
+                self._append_console(f"UDP desde {addr}: {text}")
+                typ, payload = parse_message(text)
+                if typ == "TELE":
+                    parts = payload.split("|")
+                    for p in parts:
+                        if ":" in p:
+                            k, v = p.split(":", 1)
+                            k = k.strip().upper()
+                            if k == "SPEED": self.var_speed.set(v)
+                            elif k == "BATTERY": self.var_batt.set(v)
+                            elif k == "TEMP": self.var_temp.set(v)
+                            elif k == "DIR": self.var_dir.set(v)
+                else:
+                    # también aceptar payload simple "SPEED:..|BATTERY:.."
+                    if "SPEED:" in text:
+                        parts = text.split("|")
+                        for p in parts:
+                            if ":" in p:
+                                k, v = p.split(":",1)
+                                k = k.strip().upper()
+                                if k == "SPEED": self.var_speed.set(v)
+                                elif k == "BATTERY": self.var_batt.set(v)
+                                elif k == "TEMP": self.var_temp.set(v)
+                                elif k == "DIR": self.var_dir.set(v)
+        finally:
+            self._append_console("UDP receptor terminado")
+
+    # commands
+    def send_command(self, cmd: str):
         if not self.connected or not self.is_admin:
             return
-            
         try:
-            message = self.build_message(command, "")
-            self.tcp_socket.send(message.encode())
-            self.log(f"Comando enviado: {command}")
+            self.tcp_sock.sendall(build_message(cmd, "").encode())
+            self._append_console(f"Comando enviado: {cmd}")
         except Exception as e:
-            self.log(f"Error enviando comando: {e}")
-            
-    def list_users(self):
+            self._append_console(f"Error enviando comando: {e}")
+
+    def send_list(self):
         if not self.connected or not self.is_admin:
             return
-            
         try:
-            message = self.build_message("LIST", "")
-            self.tcp_socket.send(message.encode())
-            self.log("Solicitando lista de usuarios...")
+            self.tcp_sock.sendall(build_message("LIST", "").encode())
+            self._append_console("Solicitado LIST")
         except Exception as e:
-            self.log(f"Error: {e}")
-            
-    def disconnect(self):
-        if not self.connected:
-            return
-            
+            self._append_console(f"Error LIST: {e}")
+
+    def on_disconnect(self):
+        # invoked by GUI button or when server closes
+        self.connected = False
         try:
-            message = self.build_message("DISC", "")
-            self.tcp_socket.send(message.encode())
+            if self.tcp_sock:
+                try:
+                    self.tcp_sock.sendall(build_message("DISC","").encode())
+                except: pass
+                self.tcp_sock.close()
         except:
             pass
-            
-        self.connected = False
-        
-        if self.tcp_socket:
-            self.tcp_socket.close()
-        if self.udp_socket:
-            self.udp_socket.close()
-            
-        self.log("Desconectado del servidor")
-        
-        # Resetear interfaz
-        self.connect_btn.config(state="normal")
-        self.disconnect_btn.config(state="disabled")
-        self.speedup_btn.config(state="disabled")
-        self.slowdown_btn.config(state="disabled")
-        self.left_btn.config(state="disabled")
-        self.right_btn.config(state="disabled")
-        self.list_btn.config(state="disabled")
-        
-    def build_message(self, msg_type, data):
-        data_len = len(data)
-        return f"{msg_type}|{data_len:04d}|{data}\n"
-        
-    def parse_message(self, message):
-        parts = message.strip().split("|", 2)
-        if len(parts) >= 3:
-            return parts[0], parts[2]
-        return "", ""
+        try:
+            if self.udp_sock:
+                self.udp_sock.close()
+        except:
+            pass
+        self.tcp_sock = None
+        self.udp_sock = None
+
+        for b in (self.btn_spup, self.btn_spdn, self.btn_left, self.btn_right, self.btn_list):
+            b.config(state="disabled")
+        self.btn_connect.config(state="normal")
+        self.btn_disconnect.config(state="disabled")
+        self._set_status("Desconectado")
+        self._append_console("Desconectado")
+
+    def _on_close(self):
+        try:
+            self.on_disconnect()
+        finally:
+            self.destroy()
 
 if __name__ == "__main__":
-    app = App()
-    app.protocol("WM_DELETE_WINDOW", lambda: (app.disconnect(), app.destroy()))
+    app = TelemetryApp()
     app.mainloop()
+
