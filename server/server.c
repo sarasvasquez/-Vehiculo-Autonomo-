@@ -1,4 +1,3 @@
-
 // server.c
 // Servidor que utiliza vehicle.h / vehicle.c
 // Compilar: gcc -pthread -o server server.c vehicle.c -Wall
@@ -14,10 +13,17 @@
 #include <errno.h>
 #include <stdio.h>
 
+// ===============================
+// VARIABLES GLOBALES
+// ===============================
 int tcp_socket_fd = -1;
 int udp_socket_fd = -1;
 FILE *global_log_file = NULL;
+pthread_mutex_t global_log_lock;  // 🔧 Global para todos los hilos
 
+// ===============================
+// FUNCIONES AUXILIARES
+// ===============================
 static void safe_close_int(int *fd) {
     if (fd && *fd != -1) {
         close(*fd);
@@ -34,10 +40,13 @@ void signal_handler_server(int signum) {
     }
     safe_close_int(&tcp_socket_fd);
     safe_close_int(&udp_socket_fd);
+    pthread_mutex_destroy(&global_log_lock);  // 🔧 libera el mutex
     exit(0);
 }
 
-/* Thread: handler de cliente (TCP) */
+// ===============================
+// THREAD DE CLIENTE (TCP)
+// ===============================
 void *handle_client_thread(void *arg) {
     ThreadData *td = (ThreadData*)arg;
     if (!td) return NULL;
@@ -46,8 +55,6 @@ void *handle_client_thread(void *arg) {
     struct sockaddr_in client_addr = td->client_addr;
     VehicleState *vehicle = td->vehicle;
     ClientList *client_list = td->client_list;
-    FILE *log_file = td->log_file;
-    pthread_mutex_t *log_lock = td->log_lock;
 
     char buf[BUFFER_SIZE];
     char client_ip[INET_ADDRSTRLEN];
@@ -62,7 +69,7 @@ void *handle_client_thread(void *arg) {
         return NULL;
     }
     buf[n] = '\0';
-    log_message(log_file, log_lock, "NEW", client_ip, client_port, buf);
+    log_message(global_log_file, &global_log_lock, "NEW", client_ip, client_port, buf);  // 🔧 usar globales
 
     char msg_type[32] = {0};
     char msg_data[BUFFER_SIZE] = {0};
@@ -73,7 +80,7 @@ void *handle_client_thread(void *arg) {
     if (strcmp(msg_type, "CONN") != 0) {
         build_message(response, "CERR", "INVALID_MESSAGE");
         send(client_socket, response, strlen(response), 0);
-        log_message(log_file, log_lock, "BAD_HANDSHAKE", client_ip, client_port, response);
+        log_message(global_log_file, &global_log_lock, "BAD_HANDSHAKE", client_ip, client_port, response);
         close(client_socket);
         free(td);
         return NULL;
@@ -94,7 +101,7 @@ void *handle_client_thread(void *arg) {
         if (strcmp(passwd, ADMIN_PASSWORD) != 0) {
             build_message(response, "CERR", "INVALID_CREDENTIALS");
             send(client_socket, response, strlen(response), 0);
-            log_message(log_file, log_lock, "AUTH_FAIL", client_ip, client_port, response);
+            log_message(global_log_file, &global_log_lock, "AUTH_FAIL", client_ip, client_port, response);
             close(client_socket);
             free(td);
             return NULL;
@@ -107,7 +114,7 @@ void *handle_client_thread(void *arg) {
     } else {
         build_message(response, "CERR", "INVALID_MESSAGE");
         send(client_socket, response, strlen(response), 0);
-        log_message(log_file, log_lock, "BAD_HANDSHAKE_FMT", client_ip, client_port, response);
+        log_message(global_log_file, &global_log_lock, "BAD_HANDSHAKE_FMT", client_ip, client_port, response);
         close(client_socket);
         free(td);
         return NULL;
@@ -118,7 +125,7 @@ void *handle_client_thread(void *arg) {
     if (idx < 0) {
         build_message(response, "CERR", "MAX_CLIENTS_REACHED");
         send(client_socket, response, strlen(response), 0);
-        log_message(log_file, log_lock, "MAX_CLIENTS", client_ip, client_port, response);
+        log_message(global_log_file, &global_log_lock, "MAX_CLIENTS", client_ip, client_port, response);
         close(client_socket);
         free(td);
         return NULL;
@@ -140,17 +147,17 @@ void *handle_client_thread(void *arg) {
 
     build_message(response, "CACK", client->client_id);
     send(client_socket, response, strlen(response), 0);
-    log_message(log_file, log_lock, client->client_id, client_ip, client_port, response);
+    log_message(global_log_file, &global_log_lock, client->client_id, client_ip, client_port, response);
 
     // Loop principal de comandos
     while (1) {
         ssize_t r = recv(client_socket, buf, BUFFER_SIZE - 1, 0);
         if (r <= 0) {
-            log_message(log_file, log_lock, client->client_id, client_ip, client_port, "DISCONNECTED");
+            log_message(global_log_file, &global_log_lock, client->client_id, client_ip, client_port, "DISCONNECTED");
             break;
         }
         buf[r] = '\0';
-        log_message(log_file, log_lock, client->client_id, client_ip, client_port, buf);
+        log_message(global_log_file, &global_log_lock, client->client_id, client_ip, client_port, buf);
 
         char in_type[32] = {0};
         char in_data[BUFFER_SIZE] = {0};
@@ -162,34 +169,34 @@ void *handle_client_thread(void *arg) {
             if (client->type != USER_ADMIN) {
                 build_message(response, "CMER", "NO_PERMISSION");
                 send(client_socket, response, strlen(response), 0);
-                log_message(log_file, log_lock, client->client_id, client_ip, client_port, response);
+                log_message(global_log_file, &global_log_lock, client->client_id, client_ip, client_port, response);
             } else {
                 execute_command(vehicle, in_type, response);
                 send(client_socket, response, strlen(response), 0);
-                log_message(log_file, log_lock, client->client_id, client_ip, client_port, response);
+                log_message(global_log_file, &global_log_lock, client->client_id, client_ip, client_port, response);
             }
 
         } else if (strcmp(in_type, "LIST") == 0) {
             if (client->type != USER_ADMIN) {
                 build_message(response, "CMER", "NO_PERMISSION");
                 send(client_socket, response, strlen(response), 0);
-                log_message(log_file, log_lock, client->client_id, client_ip, client_port, response);
+                log_message(global_log_file, &global_log_lock, client->client_id, client_ip, client_port, response);
             } else {
                 char listbuf[BUFFER_SIZE];
                 get_client_list_string(client_list, listbuf);
                 build_message(response, "LIST", listbuf);
                 send(client_socket, response, strlen(response), 0);
-                log_message(log_file, log_lock, client->client_id, client_ip, client_port, response);
+                log_message(global_log_file, &global_log_lock, client->client_id, client_ip, client_port, response);
             }
         } else if (strcmp(in_type, "DISC") == 0) {
             build_message(response, "DACK", "GOODBYE");
             send(client_socket, response, strlen(response), 0);
-            log_message(log_file, log_lock, client->client_id, client_ip, client_port, "DISCONNECT");
+            log_message(global_log_file, &global_log_lock, client->client_id, client_ip, client_port, "DISCONNECT");
             break;
         } else {
             build_message(response, "CERR", "INVALID_MESSAGE");
             send(client_socket, response, strlen(response), 0);
-            log_message(log_file, log_lock, client->client_id, client_ip, client_port, response);
+            log_message(global_log_file, &global_log_lock, client->client_id, client_ip, client_port, response);
         }
     }
 
@@ -199,14 +206,14 @@ void *handle_client_thread(void *arg) {
     return NULL;
 }
 
-/* Thread: enviar telemetría por UDP a cada cliente registrado */
+// ===============================
+// THREAD DE TELEMETRÍA
+// ===============================
 void *telemetry_thread(void *arg) {
     ThreadData *td = (ThreadData*)arg;
     if (!td) return NULL;
     VehicleState *vehicle = td->vehicle;
     ClientList *client_list = td->client_list;
-    FILE *log_file = td->log_file;
-    pthread_mutex_t *log_lock = td->log_lock;
 
     int udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_sock < 0) {
@@ -219,7 +226,6 @@ void *telemetry_thread(void *arg) {
 
     while (1) {
         sleep(TELEMETRY_INTERVAL);
-        // generar telemetría
         get_telemetry_string(vehicle, telebuf);
 
         pthread_mutex_lock(&client_list->lock);
@@ -235,9 +241,7 @@ void *telemetry_thread(void *arg) {
                 inet_ntop(AF_INET, &c->addr.sin_addr, ipbuf, sizeof(ipbuf));
                 char emsg[256];
                 snprintf(emsg, sizeof(emsg), "UDP_SEND_ERR: %s", strerror(errno));
-                log_message(log_file, log_lock, c->client_id, ipbuf, target_port, emsg);
-            } else {
-                // opcional: log de envío si se desea (desactivado por defecto)
+                log_message(global_log_file, &global_log_lock, c->client_id, ipbuf, target_port, emsg);
             }
         }
         pthread_mutex_unlock(&client_list->lock);
@@ -247,6 +251,9 @@ void *telemetry_thread(void *arg) {
     return NULL;
 }
 
+// ===============================
+// MAIN
+// ===============================
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         fprintf(stderr, "Uso: %s <tcp_port> <log_file>\n", argv[0]);
@@ -263,13 +270,11 @@ int main(int argc, char *argv[]) {
         perror("fopen log");
         return 1;
     }
-    global_log_file = log_file;
+    global_log_file = log_file;  // 🔧 usar global
+    pthread_mutex_init(&global_log_lock, NULL);  // 🔧 inicializar global
 
     signal(SIGINT, signal_handler_server);
     signal(SIGTERM, signal_handler_server);
-
-    pthread_mutex_t log_lock;
-    pthread_mutex_init(&log_lock, NULL);
 
     printf("===========================================\n");
     printf("  SERVIDOR VEHÍCULO AUTÓNOMO (C) \n");
@@ -311,13 +316,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // iniciar telemetry thread
+    // Iniciar hilo de telemetría
     pthread_t tid_tel;
     ThreadData *td = malloc(sizeof(ThreadData));
     td->vehicle = &vehicle;
     td->client_list = &client_list;
-    td->log_file = log_file;
-    td->log_lock = &log_lock;
     if (pthread_create(&tid_tel, NULL, telemetry_thread, td) != 0) {
         perror("pthread_create telemetry");
         free(td);
@@ -327,7 +330,7 @@ int main(int argc, char *argv[]) {
     }
     pthread_detach(tid_tel);
 
-    // accept loop
+    // Loop principal (aceptar clientes)
     while (1) {
         struct sockaddr_in cli;
         socklen_t len = sizeof(cli);
@@ -341,8 +344,6 @@ int main(int argc, char *argv[]) {
         tdata->client_addr = cli;
         tdata->vehicle = &vehicle;
         tdata->client_list = &client_list;
-        tdata->log_file = log_file;
-        tdata->log_lock = &log_lock;
 
         pthread_t tid;
         if (pthread_create(&tid, NULL, handle_client_thread, tdata) != 0) {
@@ -356,6 +357,6 @@ int main(int argc, char *argv[]) {
 
     close(tcp_sock);
     fclose(log_file);
+    pthread_mutex_destroy(&global_log_lock);
     return 0;
 }
-
