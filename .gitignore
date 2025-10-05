@@ -11,4 +11,5 @@ server/logs/
 
 # Ignorar binarios compilados
 server/server
-server/*.o
+server/*.oclients/java/Client.class
+*.o

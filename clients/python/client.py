@@ -54,7 +54,7 @@ class App(tk.Tk):
         self.password_entry.grid(row=2, column=1, padx=5)
         
         self.connect_btn = tk.Button(conn_frame, text="Conectar", 
-                                     command=self.connect, bg="green", fg="white")
+                                     command=self.connect, bg="green", fg="white", width=12)
         self.connect_btn.grid(row=2, column=2, columnspan=2, padx=5)
         
         # Frame de telemetría
@@ -87,39 +87,39 @@ class App(tk.Tk):
         tk.Label(telem_frame, textvariable=self.v_dir, 
                 font=("Helvetica", 28, "bold"), fg="purple").grid(row=3, column=1, sticky="w")
         
-        # Frame de comandos
+        # Frame de comandos - AQUÍ ESTÁN LOS BOTONES
         cmd_frame = tk.LabelFrame(self, text="Comandos (Solo Admin)", 
                                  padx=10, pady=10)
         cmd_frame.pack(fill="x", padx=10, pady=10)
         
         self.speedup_btn = tk.Button(cmd_frame, text="⬆ SPEED UP", 
                                      command=lambda: self.send_command("SPUP"),
-                                     state="disabled", width=15)
+                                     state="disabled", width=15, bg="#4CAF50", fg="white")
         self.speedup_btn.grid(row=0, column=0, padx=5, pady=5)
         
         self.slowdown_btn = tk.Button(cmd_frame, text="⬇ SLOW DOWN", 
                                       command=lambda: self.send_command("SPDN"),
-                                      state="disabled", width=15)
+                                      state="disabled", width=15, bg="#2196F3", fg="white")
         self.slowdown_btn.grid(row=0, column=1, padx=5, pady=5)
         
         self.left_btn = tk.Button(cmd_frame, text="⬅ TURN LEFT", 
                                  command=lambda: self.send_command("TNLF"),
-                                 state="disabled", width=15)
+                                 state="disabled", width=15, bg="#FF9800", fg="white")
         self.left_btn.grid(row=1, column=0, padx=5, pady=5)
         
         self.right_btn = tk.Button(cmd_frame, text="➡ TURN RIGHT", 
                                   command=lambda: self.send_command("TNRT"),
-                                  state="disabled", width=15)
+                                  state="disabled", width=15, bg="#9C27B0", fg="white")
         self.right_btn.grid(row=1, column=1, padx=5, pady=5)
         
         self.list_btn = tk.Button(cmd_frame, text="📋 LIST USERS", 
                                  command=self.list_users,
-                                 state="disabled", width=15)
+                                 state="disabled", width=15, bg="#607D8B", fg="white")
         self.list_btn.grid(row=2, column=0, padx=5, pady=5)
         
         self.disconnect_btn = tk.Button(cmd_frame, text="❌ DISCONNECT", 
                                        command=self.disconnect,
-                                       state="disabled", width=15, bg="red", fg="white")
+                                       state="disabled", width=15, bg="#F44336", fg="white")
         self.disconnect_btn.grid(row=2, column=1, padx=5, pady=5)
         
         # Consola de mensajes
@@ -187,12 +187,16 @@ class App(tk.Tk):
                 self.connect_btn.config(state="disabled")
                 self.disconnect_btn.config(state="normal")
                 
+                # IMPORTANTE: Habilitar botones si es admin
                 if self.is_admin:
                     self.speedup_btn.config(state="normal")
                     self.slowdown_btn.config(state="normal")
                     self.left_btn.config(state="normal")
                     self.right_btn.config(state="normal")
                     self.list_btn.config(state="normal")
+                    self.log("✓ Botones de control habilitados (Admin)")
+                else:
+                    self.log("ℹ Solo lectura (Observer)")
                     
             elif msg_type == "CERR":
                 self.log(f"✗ Error: {msg_data}")

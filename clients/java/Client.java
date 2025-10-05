@@ -79,7 +79,8 @@ public class Client extends JFrame {
         
         gbc.gridx = 2; gbc.gridwidth = 2;
         connectBtn = new JButton("Conectar");
-        connectBtn.setBackground(Color.GREEN);
+        connectBtn.setBackground(new Color(76, 175, 80));
+        connectBtn.setForeground(Color.WHITE);
         connectBtn.addActionListener(e -> connect());
         connPanel.add(connectBtn, gbc);
         
@@ -99,7 +100,7 @@ public class Client extends JFrame {
         telemPanel.add(new JLabel("Batería:", SwingConstants.RIGHT));
         batteryLabel = new JLabel("0", SwingConstants.LEFT);
         batteryLabel.setFont(new Font("Arial", Font.BOLD, 24));
-        batteryLabel.setForeground(Color.GREEN);
+        batteryLabel.setForeground(new Color(76, 175, 80));
         telemPanel.add(batteryLabel);
         telemPanel.add(new JLabel("%"));
         
@@ -113,44 +114,54 @@ public class Client extends JFrame {
         telemPanel.add(new JLabel("Dirección:", SwingConstants.RIGHT));
         dirLabel = new JLabel("-", SwingConstants.LEFT);
         dirLabel.setFont(new Font("Arial", Font.BOLD, 24));
-        dirLabel.setForeground(new Color(128, 0, 128));
+        dirLabel.setForeground(new Color(156, 39, 176));
         telemPanel.add(dirLabel);
         telemPanel.add(new JLabel(""));
         
         add(telemPanel, BorderLayout.CENTER);
         
-        // Panel de comandos
+        // Panel de comandos - AQUÍ ESTÁN LOS BOTONES
         JPanel cmdPanel = new JPanel(new GridLayout(3, 2, 5, 5));
         cmdPanel.setBorder(BorderFactory.createTitledBorder("Comandos (Solo Admin)"));
         
         speedUpBtn = new JButton("⬆ SPEED UP");
         speedUpBtn.setEnabled(false);
+        speedUpBtn.setBackground(new Color(76, 175, 80));
+        speedUpBtn.setForeground(Color.WHITE);
         speedUpBtn.addActionListener(e -> sendCommand("SPUP"));
         cmdPanel.add(speedUpBtn);
         
         slowDownBtn = new JButton("⬇ SLOW DOWN");
         slowDownBtn.setEnabled(false);
+        slowDownBtn.setBackground(new Color(33, 150, 243));
+        slowDownBtn.setForeground(Color.WHITE);
         slowDownBtn.addActionListener(e -> sendCommand("SPDN"));
         cmdPanel.add(slowDownBtn);
         
         leftBtn = new JButton("⬅ TURN LEFT");
         leftBtn.setEnabled(false);
+        leftBtn.setBackground(new Color(255, 152, 0));
+        leftBtn.setForeground(Color.WHITE);
         leftBtn.addActionListener(e -> sendCommand("TNLF"));
         cmdPanel.add(leftBtn);
         
         rightBtn = new JButton("➡ TURN RIGHT");
         rightBtn.setEnabled(false);
+        rightBtn.setBackground(new Color(156, 39, 176));
+        rightBtn.setForeground(Color.WHITE);
         rightBtn.addActionListener(e -> sendCommand("TNRT"));
         cmdPanel.add(rightBtn);
         
         listBtn = new JButton("📋 LIST USERS");
         listBtn.setEnabled(false);
+        listBtn.setBackground(new Color(96, 125, 139));
+        listBtn.setForeground(Color.WHITE);
         listBtn.addActionListener(e -> sendCommand("LIST"));
         cmdPanel.add(listBtn);
         
         disconnectBtn = new JButton("❌ DISCONNECT");
         disconnectBtn.setEnabled(false);
-        disconnectBtn.setBackground(Color.RED);
+        disconnectBtn.setBackground(new Color(244, 67, 54));
         disconnectBtn.setForeground(Color.WHITE);
         disconnectBtn.addActionListener(e -> disconnect());
         cmdPanel.add(disconnectBtn);
@@ -233,12 +244,16 @@ public class Client extends JFrame {
                     connectBtn.setEnabled(false);
                     disconnectBtn.setEnabled(true);
                     
+                    // IMPORTANTE: Habilitar botones si es admin
                     if (isAdmin) {
                         speedUpBtn.setEnabled(true);
                         slowDownBtn.setEnabled(true);
                         leftBtn.setEnabled(true);
                         rightBtn.setEnabled(true);
                         listBtn.setEnabled(true);
+                        log("✓ Botones de control habilitados (Admin)");
+                    } else {
+                        log("ℹ Solo lectura (Observer)");
                     }
                 });
                 

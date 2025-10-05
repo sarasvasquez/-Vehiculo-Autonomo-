@@ -1,9 +1,14 @@
+// server.c
+// Servidor del Vehículo Autónomo Terrestre
+// Compilar: make
+// Uso: ./server <tcp_port> <logfile>
+
 #include "vehicle.h"
 #include <signal.h>
 
-
+// ============================================================
 // VARIABLES GLOBALES (para poder cerrar desde signal handler)
-
+// ============================================================
 int tcp_socket_fd = -1;
 int udp_socket_fd = -1;
 FILE *global_log_file = NULL;
@@ -17,9 +22,9 @@ void signal_handler(int signum) {
     exit(0);
 }
 
-
+// ============================================================
 // THREAD: MANEJO DE CADA CLIENTE TCP
-
+// ============================================================
 void* handle_client(void* arg) {
     ThreadData *data = (ThreadData*)arg;
     int client_socket = data->client_socket;
@@ -64,6 +69,12 @@ void* handle_client(void* arg) {
             // Extraer password después de "ADMIN:"
             char *password = msg_data + 6;
             
+            // Verificar si hay puerto UDP especificado (formato: ADMIN:password:port)
+            char *colon = strchr(password, ':');
+            if (colon) {
+                *colon = '\0'; // Terminar el string del password
+            }
+            
             if (strcmp(password, ADMIN_PASSWORD) == 0) {
                 // Password correcto
                 user_type = USER_ADMIN;
@@ -91,7 +102,7 @@ void* handle_client(void* arg) {
                 free(data);
                 return NULL;
             }
-        } else if (strcmp(msg_data, "OBSERVER") == 0) {
+        } else if (strcmp(msg_data, "OBSERVER") == 0 || strncmp(msg_data, "OBSERVER:", 9) == 0) {
             // Conectar como observador
             user_type = USER_OBSERVER;
             int index = add_client(client_list, client_socket, client_addr, user_type);
@@ -191,13 +202,15 @@ void* handle_client(void* arg) {
     return NULL;
 }
 
-
+// ============================================================
 // THREAD: ENVÍO DE TELEMETRÍA UDP CADA 10 SEGUNDOS
-
+// ============================================================
 void* send_telemetry(void* arg) {
     ThreadData *data = (ThreadData*)arg;
     VehicleState *vehicle = data->vehicle;
     ClientList *client_list = data->client_list;
+    FILE *log_file = data->log_file;
+    pthread_mutex_t *log_lock = data->log_lock;
     
     // Crear socket UDP
     int udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -206,7 +219,7 @@ void* send_telemetry(void* arg) {
         return NULL;
     }
     
-    // IMPORTANTE: Habilitar broadcast
+    // Habilitar broadcast
     int broadcast = 1;
     if (setsockopt(udp_sock, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast)) < 0) {
         perror("Error configurando broadcast");
@@ -229,27 +242,27 @@ void* send_telemetry(void* arg) {
         
         int sent_count = 0;
         for (int i = 0; i < MAX_CLIENTS; i++) {
-            if (client_list->clients[i].active) {
-                struct sockaddr_in client_addr = client_list->clients[i].addr;
-                
-                // CAMBIO CRÍTICO: Configurar puerto UDP correcto
-                client_addr.sin_port = htons(5001);
-                
-                // Enviar por UDP
-                ssize_t sent = sendto(udp_sock, buffer, strlen(buffer), 0,
-                       (struct sockaddr*)&client_addr, sizeof(client_addr));
-                
-                if (sent > 0) {
-                    sent_count++;
-                    printf("[TELEMETRY] Enviado a %s:%d (%zd bytes)\n", 
-                           inet_ntoa(client_addr.sin_addr), 
-                           ntohs(client_addr.sin_port), 
-                           sent);
-                } else {
-                    printf("[TELEMETRY] Error enviando a %s:%d\n",
-                           inet_ntoa(client_addr.sin_addr),
-                           ntohs(client_addr.sin_port));
-                }
+            if (!client_list->clients[i].active) continue;
+            
+            ClientInfo *c = &client_list->clients[i];
+            struct sockaddr_in dest = c->addr;
+            
+            // Configurar puerto UDP estándar del protocolo (5001)
+            dest.sin_port = htons(5001);
+            
+            // Enviar por UDP
+            ssize_t sent = sendto(udp_sock, buffer, strlen(buffer), 0,
+                                  (struct sockaddr*)&dest, sizeof(dest));
+            
+            if (sent > 0) {
+                sent_count++;
+            } else {
+                // Log de error si falla el envío
+                char ipbuf[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &c->addr.sin_addr, ipbuf, sizeof(ipbuf));
+                char error_msg[256];
+                snprintf(error_msg, sizeof(error_msg), "UDP_SEND_ERROR: %s", strerror(errno));
+                log_message(log_file, log_lock, c->client_id, ipbuf, 5001, error_msg);
             }
         }
         
@@ -262,9 +275,9 @@ void* send_telemetry(void* arg) {
     return NULL;
 }
 
-
+// ============================================================
 // FUNCIÓN PRINCIPAL
-
+// ============================================================
 int main(int argc, char *argv[]) {
     // Verificar argumentos
     if (argc != 3) {
@@ -350,6 +363,8 @@ int main(int argc, char *argv[]) {
     ThreadData *telemetry_data = malloc(sizeof(ThreadData));
     telemetry_data->vehicle = &vehicle;
     telemetry_data->client_list = &client_list;
+    telemetry_data->log_file = log_file;
+    telemetry_data->log_lock = &log_lock;
     pthread_create(&telemetry_thread, NULL, send_telemetry, telemetry_data);
     pthread_detach(telemetry_thread);
     
