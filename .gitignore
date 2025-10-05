@@ -12,3 +12,7 @@ server/logs/
 # Ignorar binarios compilados
 server/server
 server/*.o
+
+# Ignorar archivos compilados de Java
+*.class
+*.jar
