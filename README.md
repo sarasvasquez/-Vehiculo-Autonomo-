@@ -4,6 +4,10 @@
  **Periodo:** 2025-2  
  **Equipo de trabajo:** *Sara Isabel Vasquez, Maria Clara Medina, Nicol Franchesca Garcia*  
 
+ Linl video explicativo: 
+ https://eafit-my.sharepoint.com/:v:/g/personal/mcmedinag_eafit_edu_co/EVA1WQA6IsBNo5Es6yxdCLwBAmYztJ1AfanuXq56G_6RjQ
+ 
+
 ---
 
 ##  Descripción
@@ -52,4 +56,5 @@ El sistema incluye:
 - **Herramientas de apoyo:** Wireshark, Postman, Beej’s Guide.  
 
 ---
+
 
