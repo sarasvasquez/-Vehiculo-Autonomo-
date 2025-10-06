@@ -46,6 +46,10 @@ COMPILAR:
 cd server
 make
 
+O MANUALMENTE : 
+gcc -pthread -o server server.c vehicle.c -Wall
+---------
+
 EJECUTAR:
 ---------
 ./server 5000 logs/server.log
@@ -60,3 +64,68 @@ NOTAS:
 - Si estás en Windows y ves errores de "include", necesitas abrir
   el proyecto EN WSL usando VS Code con la extensión WSL instalada.
 - En VS Code, presiona Ctrl+Shift+P y selecciona "WSL: Connect to WSL"
+
+
+CORRER CLIENTE PYTHON: 
+
+- Terminal 1:
+
+Entrar a la carpeta del servidor:
+cd server
+
+Compilar el servidor:
+---------
+
+gcc -pthread -o server server.c vehicle.c -Wall
+
+Ejecutar el servidor (puerto y ruta del log pueden variar):
+---------
+
+./server 5555 logs/server.log
+
+- Terminal 2:
+
+Activar el entorno virtual de Python (si existe):
+---------
+
+source .venv311/bin/activate
+(en Windows usar: .venv311\Scripts\activate)
+
+Entrar a la carpeta donde está el cliente:
+cd client
+
+Ejecutar el cliente Python:
+---------
+
+python3 client.py
+
+
+
+CORRER SERVIDOR Y CLIENTE JAVA: 
+---------
+
+- Terminal 1:
+
+Entrar a la carpeta del servidor:
+cd server
+
+Compilar el servidor con soporte UDP:
+---------
+gcc -pthread -o server server.c vehicle.c -Wall -DUDP_FALLBACK_PORT=5001
+
+Ejecutar el servidor:
+---------
+./server 5555 logs/server.log
+
+- Terminal 2:
+Entrar a la carpeta donde están los archivos Java:
+cd clients/java
+
+Compilar el cliente Java:
+---------
+javac clients/java/Client.java
+
+
+Ejecutar el cliente:
+---------
+java clients.java.Client
